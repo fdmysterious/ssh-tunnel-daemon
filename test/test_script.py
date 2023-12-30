@@ -40,45 +40,45 @@ def start_containers():
 
     return source_container_id, target_container_id
 
+
 def get_container_ip(cid):
     # https://stackoverflow.com/questions/17157721/how-to-get-a-docker-containers-ip-address-from-the-host
-
-    result = subprocess.run(["docker", "inspect", "-f", "{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}", cid], capture_output=True, text=True)
+    result = subprocess.run(["just", "get_ip", cid], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Could not get container's IP address:\n{result.stderr}")
 
     return result.stdout.strip()
 
+
 def create_test_user(cid):
     log.info(f"Create test user {TEST_USER_NAME} on container {cid}")
-    
-    result = subprocess.run(["docker", "exec", "-it", cid, "ash", "-c", f"adduser -D {TEST_USER_NAME} && echo \"{TEST_USER_NAME}:test\" | chpasswd"], capture_output=True, text=True)
+    result = subprocess.run(["just", "create_user", cid, TEST_USER_NAME], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Could not create test user:\n{result.stderr}{result.stdout}")
-
     log.debug(result.stdout.strip())
+
 
 def create_ssh_key(cid):
     log.info(f"Create ssh key on user {TEST_USER_NAME} on container {cid}")
-    result = subprocess.run(["docker", "exec", "-it", "-u", TEST_USER_NAME, cid, "ash", "-c", f"ssh-keygen -q -t ed25519 -f ~/.ssh/id_rsa -N ''"], capture_output=True, text=True)
-
+    result = subprocess.run(["just", "create_ssh_key", cid, TEST_USER_NAME], capture_output=True, text=True)
     log.info(f"Result stdout:\n{result.stdout}")
     
     if result.returncode != 0:
         raise RuntimeError(f"Failed to create ssh key:\n{result.stderr}")
 
+
 def retrieve_ssh_key(cid):
     log.info(f"Retrieve SSH key for user {TEST_USER_NAME} on container {cid}")
-
-    result = subprocess.run(["docker", "exec", "-it", "-u", TEST_USER_NAME, cid, "cat", f"/home/{TEST_USER_NAME}/.ssh/id_rsa.pub"], capture_output=True, text=True)
+    result = subprocess.run(["just", "retrieve_ssh_key", cid, TEST_USER_NAME], capture_output=True, text=True)
 
     if result.returncode != 0:
         raise RuntimeError(f"Failed to retrieve ssh key:\n{result.stderr}{result.stdout}")
     return result.stdout.strip()
 
+
 def add_key_to_container(cid, key):
     log.info(f"Register key {key} to container {cid}")
-    result = subprocess.run(["docker", "exec", "-it", "-u", TEST_USER_NAME, cid, "ash", "-c", f"echo '{key}' >> /home/{TEST_USER_NAME}/.ssh/authorized_keys"], capture_output=True, text=True)
+    result = subprocess.run(["just", "add_key_to_container", cid, TEST_USER_NAME, key], capture_output=True, text=True)
 
 
 if __name__ == "__main__":

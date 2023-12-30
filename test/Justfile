@@ -10,5 +10,22 @@ start_test_container:
 stop id:
 	docker stop {{id}}
 
+# https://stackoverflow.com/questions/17157721/how-to-get-a-docker-containers-ip-address-from-the-host
+get_ip id:
+	@docker inspect -f "{{{{range.NetworkSettings.Networks}}{{{{.IPAddress}}{{{{end}}" {{id}}
+
+create_user cid test_user_name:
+	docker exec -it {{cid}} ash -c "adduser -D {{test_user_name}} && echo \"{{test_user_name}}:test\" | chpasswd"
+
+create_ssh_key cid test_user_name:
+	docker exec -u {{test_user_name}} -it {{cid}} ash -c "ssh-keygen -q -t ed25519 -f ~/.ssh/id_rsa -N ''"
+
+retrieve_ssh_key cid test_user_name:
+	@docker exec -u {{test_user_name}} -it {{cid}} cat "/home/{{test_user_name}}/.ssh/id_rsa.pub"
+
+add_key_to_container cid test_user_name key:
+	docker exec -it -u {{test_user_name}} cid ash -c "echo '{{key}}' >> /home/{{test_user_name}}/.ssh/authorized_keys"
+	
+
 test:
 	python3 test_script.py
