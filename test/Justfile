@@ -1,0 +1,14 @@
+docker_image     := "valbrout_scripts:ssh_tunnel_test_env"
+source_container := "test_source"
+
+build:
+	docker buildx build --load -t {{docker_image}} -f Dockerfile .
+
+start_test_container:
+	docker run --rm -d --cap-add AUDIT_CONTROL {{docker_image}}
+
+stop id:
+	docker stop {{id}}
+
+test:
+	python3 test_script.py
