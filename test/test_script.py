@@ -1,10 +1,13 @@
 import logging
 import traceback
 import subprocess
+import time
+import signal
 
-TEST_USER_NAME="tunnelist"
+TEST_USER_NAME = "tunnelist"
+REMOTE_PORT    = 2503
 
-log                 = None
+log            = None
 
 def init_log():
     global log
@@ -79,6 +82,55 @@ def retrieve_ssh_key(cid):
 def add_key_to_container(cid, key):
     log.info(f"Register key {key} to container {cid}")
     result = subprocess.run(["just", "add_key_to_container", cid, TEST_USER_NAME, key], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Could not add key to container:\n{result.stderr}")
+
+
+def copy_script(cid):
+    log.info(f"Copy script to container {cid}")
+    result = subprocess.run(["just", "copy_script", cid, TEST_USER_NAME], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Could not copy script:\n{result.stderr}")
+
+
+def start_tunnel(cid, remote_port, remote_user, remote_host):
+    log.info(f"Start tunnel on {cid} with:")
+    log.info(f"- remote_port = {remote_port}")
+    log.info(f"- remote_user = {remote_user}")
+    log.info(f"- remote_host = {remote_host}")
+
+    result = subprocess.run(["just", "start_tunnel", cid, TEST_USER_NAME, str(remote_port), remote_user, remote_host], capture_output=True, text=True)
+
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to start ssh tunnel:\n{result.stderr}\n{result.stdout}")
+
+
+def stop_tunnel(cid):
+    log.info(f"Stopping tunnel on {cid}")
+
+    result = subprocess.run(["just", "stop_tunnel", cid], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed to stop tunnel:\n{result.stderr}\n{result.stdout}")
+
+
+def try_connection(cid, remote_port, remote_user):
+    log.info("Try connection with:")
+    log.info(f"- remote_port = {remote_port}")
+    log.info(f"- remote_user = {remote_user}")
+
+    result = subprocess.run(["just", "try_connection", cid, TEST_USER_NAME, str(remote_port), remote_user], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"Failed connection check with return code {result.returncode}\n{result.stdout}\n{result.stderr}")
+
+    log.info("Connection successful!")
+
+
+def get_tunnel_logs(cid):
+    log.info(f"Getting tunnel logs on {cid}")
+    result = subprocess.run(["just", "get_tunnel_logs", cid, TEST_USER_NAME], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("Failed to retrieve logs:\n{result.stderr}\n{result.stdout}")
+    return result.stdout
 
 
 if __name__ == "__main__":
@@ -114,6 +166,22 @@ if __name__ == "__main__":
 
             add_key_to_container(source_container_id, pub_key_target)
             add_key_to_container(target_container_id, pub_key_source)
+
+            copy_script(source_container_id)
+
+
+            # Standard connection test
+
+            start_tunnel(source_container_id, REMOTE_PORT, TEST_USER_NAME, target_ip)
+            log.info("Waiting 5s")
+            time.sleep(5)
+            try_connection(target_container_id, REMOTE_PORT, TEST_USER_NAME)
+            stop_tunnel(source_container_id)
+            
+
+            # Altering target host identification, and ensuring that the tunnel script
+            # detects it properly.
+
 
         finally:
             pass

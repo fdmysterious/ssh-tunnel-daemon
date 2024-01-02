@@ -24,8 +24,32 @@ retrieve_ssh_key cid test_user_name:
 	@docker exec -u {{test_user_name}} -it {{cid}} cat "/home/{{test_user_name}}/.ssh/id_rsa.pub"
 
 add_key_to_container cid test_user_name key:
-	docker exec -it -u {{test_user_name}} cid ash -c "echo '{{key}}' >> /home/{{test_user_name}}/.ssh/authorized_keys"
-	
+	docker exec -it -u {{test_user_name}} {{cid}} ash -c "echo '{{key}}' >> /home/{{test_user_name}}/.ssh/authorized_keys"
 
+copy_script cid test_user_name:
+	docker cp ../ssh_tunnel.py {{cid}}:/home/{{test_user_name}}/ssh_tunnel.py
+
+#start_tunnel cid test_user_name remote_port remote_user remote_host:
+#	# https://stackoverflow.com/questions/29704358/how-to-keep-program-running-in-background-in-ash-shell
+#	docker exec -d -it -u {{test_user_name}} {{cid}} python3 /home/{{test_user_name}}/ssh_tunnel.py --remote_port {{remote_port}} --remote_user {{remote_user}} --remote_host {{remote_host}}
+
+start_tunnel cid test_user_name remote_port remote_user remote_host:
+	docker exec -d -it -u {{test_user_name}} {{cid}} sh /start_process.sh python3 /home/{{test_user_name}}/ssh_tunnel.py --remote_port {{remote_port}} --remote_user {{remote_user}} --remote_host {{remote_host}}
+
+stop_tunnel cid:
+	docker exec -it {{cid}} ash -c 'kill -SIGINT `cat /tmp/pidfile`'
+
+get_tunnel_logs cid test_user_name:
+	docker exec -it -u {{test_user_name}} {{cid}} cat /tmp/stderr.log
+
+try_connection cid test_user_name remote_port remote_user:
+	docker exec -it -u {{test_user_name}} {{cid}} ssh -p {{remote_port}} -o StrictHostKeyChecking=accept-new -q {{remote_user}}@localhost exit
+
+shell cid:
+	docker exec -it {{cid}} ash
+	
 test:
 	python3 test_script.py
+
+stop_all:
+	docker stop `docker ps -q --filter "ancestor={{docker_image}}"`
