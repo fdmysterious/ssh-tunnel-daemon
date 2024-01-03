@@ -134,6 +134,27 @@ def get_tunnel_logs(cid):
     return result.stdout
 
 
+def shift_known_hosts(cid, test_user_name):
+    log.info(f"Shifting known_hosts key on {cid}")
+
+    result = subprocess.run(["just", "shift_known_hosts", cid, TEST_USER_NAME], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError("Failed to shift known hosts:\n{result.stderr}\n{result.stdout}")
+
+
+def try_connection_fail(cid, remote_port, remote_user, host):
+    log.info("Try connection failure with:")
+    log.info(f"- remote_port = {remote_port}")
+    log.info(f"- remote_user = {remote_user}")
+    log.info(f"- host        = {host}"       )
+
+    result = subprocess.run(["just", "try_connection", cid, TEST_USER_NAME, str(remote_port), remote_user, host], capture_output=True, text=True)
+    if result.returncode == 0:
+        raise RuntimeError(f"Failed connection failure check with return code {result.returncode}\n{result.stdout}\n{result.stderr}")
+
+    log.info("Connection fails !")
+
+
 if __name__ == "__main__":
     init_log()
     log.info("Hello world!")
@@ -184,11 +205,18 @@ if __name__ == "__main__":
             # Altering target host identification, and ensuring that the tunnel script
             # detects it properly.
 
+            shift_known_hosts(source_container_id, TEST_USER_NAME)
+
+            start_tunnel(source_container_id, REMOTE_PORT, TEST_USER_NAME, target_ip)
+            log.info("Waiting 5s")
+            time.sleep(5)
+            try_connection_fail(target_container_id, REMOTE_PORT, TEST_USER_NAME, "localhost")
+            stop_tunnel(source_container_id)
+
 
         finally:
-            pass
-            #stop_container(source_container_id)
-            #stop_container(target_container_id)
+            stop_container(source_container_id)
+            stop_container(target_container_id)
 
     except Exception as exc:
         log.error("Error in test:")
