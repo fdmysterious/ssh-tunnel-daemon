@@ -113,12 +113,13 @@ def stop_tunnel(cid):
         raise RuntimeError(f"Failed to stop tunnel:\n{result.stderr}\n{result.stdout}")
 
 
-def try_connection(cid, remote_port, remote_user):
+def try_connection(cid, remote_port, remote_user, host):
     log.info("Try connection with:")
     log.info(f"- remote_port = {remote_port}")
     log.info(f"- remote_user = {remote_user}")
+    log.info(f"- host        = {host}"       )
 
-    result = subprocess.run(["just", "try_connection", cid, TEST_USER_NAME, str(remote_port), remote_user], capture_output=True, text=True)
+    result = subprocess.run(["just", "try_connection", cid, TEST_USER_NAME, str(remote_port), remote_user, host], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"Failed connection check with return code {result.returncode}\n{result.stdout}\n{result.stderr}")
 
@@ -169,13 +170,14 @@ if __name__ == "__main__":
 
             copy_script(source_container_id)
 
+            # Connect first time to target to register known_hosts key
+            try_connection(source_container_id, 22, TEST_USER_NAME, target_ip)
 
             # Standard connection test
-
             start_tunnel(source_container_id, REMOTE_PORT, TEST_USER_NAME, target_ip)
             log.info("Waiting 5s")
             time.sleep(5)
-            try_connection(target_container_id, REMOTE_PORT, TEST_USER_NAME)
+            try_connection(target_container_id, REMOTE_PORT, TEST_USER_NAME, "localhost")
             stop_tunnel(source_container_id)
             
 

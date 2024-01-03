@@ -42,8 +42,8 @@ stop_tunnel cid:
 get_tunnel_logs cid test_user_name:
 	docker exec -it -u {{test_user_name}} {{cid}} cat /tmp/stderr.log
 
-try_connection cid test_user_name remote_port remote_user:
-	docker exec -it -u {{test_user_name}} {{cid}} ssh -p {{remote_port}} -o StrictHostKeyChecking=accept-new -q {{remote_user}}@localhost exit
+try_connection cid test_user_name remote_port remote_user host:
+	docker exec -it -u {{test_user_name}} {{cid}} ssh -p {{remote_port}} -o StrictHostKeyChecking=accept-new -q {{remote_user}}@{{host}} exit
 
 shell cid:
 	docker exec -it {{cid}} ash
@@ -53,3 +53,39 @@ test:
 
 stop_all:
 	docker stop `docker ps -q --filter "ancestor={{docker_image}}"`
+
+shift_key:
+	#!/bin/env python3
+	input  = input()
+	tokens = input.split(" ")
+
+	def shift_char(x):
+		shift1 = "abcdefghijklmnopqrstuvwxyz"
+		shift2 = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		shift3 = "0123456789"
+
+		if x in shift1:
+			idx = shift1.index(x)
+			return shift1[(idx+2)%len(shift1)]
+		elif x in shift2:
+			idx = shift2.index(x)
+			return shift2[(idx+9)%len(shift2)]
+		elif x in shift3:
+			idx = shift3.index(x)
+			return shift3[(idx+3)%len(shift3)]
+		else:
+			return x
+
+	print(f"{tokens[0]} {tokens[1]} {''.join(map(shift_char, tokens[2]))}")
+
+
+cat_known_hosts cid test_user_name:
+	docker exec -it -u {{test_user_name}} {{cid}} cat /home/{{test_user_name}}/.ssh/known_hosts
+
+shift_known_hosts cid test_user_name:
+	#just cat_known_hosts {{cid}} {{test_user_name}} | just shift_key | docker exec -i -u {{test_user_name}} {{cid}} sh -c "cat > /home/{{test_user_name}}/.ssh/known_hosts"
+	docker cp {{cid}}:/home/{{test_user_name}}/.ssh/known_hosts /tmp/known_hosts
+	cat /tmp/known_hosts | just shift_key | docker exec -i -u {{test_user_name}} {{cid}} sh -c "cat > /home/{{test_user_name}}/.ssh/known_hosts"
+
+get_fingerprint cid test_user_name:
+	docker exec -it -u {{test_user_name}} {{cid}} ash -c "ssh-keyscan localhost | ssh-keygen -lf -"

@@ -71,7 +71,7 @@ def open_tunnel(
         "-o",
         "ServerAliveInterval=60",
         "-o",
-        "StrictHostKeyChecking=accept-new",
+        "StrictHostKeyChecking=yes", # User must connect one time using user before launching this script to create the correct known_hosts entry
         "-NR",
         f"{remote_port}:localhost:{local_port}",
         f"{remote_user}@{remote_host}",
